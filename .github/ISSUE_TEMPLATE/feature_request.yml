@@ -1,0 +1,20 @@
+name: 💡 Feature Request
+description: Suggest an idea or new feature for TG Feed Aggregator
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for suggesting a feature!
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Problem & Solution Proposal
+      description: A clear and concise description of the feature or proposal.
+      placeholder: Describe the feature here...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative solutions or features you've considered.

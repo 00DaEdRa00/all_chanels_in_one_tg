@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 520" width="100%" height="100%">
+  <defs>
+    <linearGradient id="archBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1120" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+
+    <linearGradient id="nodeGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <linearGradient id="blueGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="520" rx="16" fill="url(#archBg)" stroke="#1e293b" stroke-width="1.5" />
+
+  <!-- Header -->
+  <text x="50" y="55" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="700">
+    Системная архитектура агрегатора каналов (Data Flow &amp; Filters)
+  </text>
+  <text x="50" y="80" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13">
+    Гибридный конвейер: MTProto скрапинг папок + Async SQLite хранилище + Bot API интерактивный UI
+  </text>
+
+  <!-- Node 1: Source (Telegram Chatlist & Channels) -->
+  <g transform="translate(50, 120)">
+    <rect width="220" height="340" rx="12" fill="url(#nodeGrad1)" stroke="#0284c7" stroke-width="1.5" />
+    <rect x="0" y="0" width="220" height="42" rx="12" fill="#0284c7" fill-opacity="0.15" />
+    <text x="110" y="27" fill="#38bdf8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" text-anchor="middle">1. Источники Telegram</text>
+
+    <!-- Sub-elements -->
+    <rect x="15" y="60" width="190" height="65" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="85" fill="#e2e8f0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">t.me/addlist/... Ссылка</text>
+    <text x="25" y="105" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">Расшаренная папка чатов</text>
+
+    <rect x="15" y="140" width="190" height="50" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="162" fill="#e2e8f0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">📢 Канал А (AI News)</text>
+    <text x="25" y="178" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="10">Поток публикаций</text>
+
+    <rect x="15" y="205" width="190" height="50" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="227" fill="#e2e8f0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">📢 Канал B (Dev Tech)</text>
+    <text x="25" y="243" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="10">Поток публикаций</text>
+
+    <rect x="15" y="270" width="190" height="50" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="292" fill="#e2e8f0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">📢 Канал N (...)</text>
+    <text x="25" y="308" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="10">Поток публикаций</text>
+  </g>
+
+  <!-- Arrow 1 -> 2 -->
+  <path d="M 270 230 L 320 230" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" />
+  <text x="295" y="220" fill="#38bdf8" font-size="11" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto">MTProto</text>
+
+  <!-- Node 2: Core Ingestion (Telethon MTProto) -->
+  <g transform="translate(325, 120)">
+    <rect width="220" height="340" rx="12" fill="url(#nodeGrad1)" stroke="#6366f1" stroke-width="1.5" />
+    <rect x="0" y="0" width="220" height="42" rx="12" fill="#6366f1" fill-opacity="0.15" />
+    <text x="110" y="27" fill="#818cf8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" text-anchor="middle">2. Telethon MTProto</text>
+
+    <rect x="15" y="60" width="190" height="75" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="85" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">CheckChatlistInvite</text>
+    <text x="25" y="105" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">Парсинг имени папки</text>
+    <text x="25" y="122" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">и списка каналов</text>
+
+    <rect x="15" y="150" width="190" height="80" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="175" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">Diff Engine</text>
+    <text x="25" y="195" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">Сравнение со старой БД:</text>
+    <text x="25" y="212" fill="#34d399" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">+Новые / -Удаленные</text>
+
+    <rect x="15" y="245" width="190" height="75" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="270" fill="#c7d2fe" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">Channel Stream</text>
+    <text x="25" y="290" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">Перехват NewMessage</text>
+    <text x="25" y="307" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">Текст + Фото + Видео</text>
+  </g>
+
+  <!-- Arrow 2 -> 3 -->
+  <path d="M 545 230 L 595 230" stroke="#818cf8" stroke-width="2" />
+  <text x="570" y="220" fill="#818cf8" font-size="11" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto">CRUD</text>
+
+  <!-- Node 3: Database & Filters -->
+  <g transform="translate(600, 120)">
+    <rect width="210" height="340" rx="12" fill="url(#nodeGrad1)" stroke="#10b981" stroke-width="1.5" />
+    <rect x="0" y="0" width="210" height="42" rx="12" fill="#10b981" fill-opacity="0.15" />
+    <text x="105" y="27" fill="#34d399" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" text-anchor="middle">3. SQLite + Filters</text>
+
+    <rect x="15" y="60" width="180" height="70" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="85" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">Таблица folders</text>
+    <text x="25" y="105" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">user_id, slug, title,</text>
+    <text x="25" y="120" fill="#38bdf8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">is_active (Вкл/Выкл)</text>
+
+    <rect x="15" y="145" width="180" height="85" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="170" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">Таблица channels</text>
+    <text x="25" y="190" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">folder_channels mapping</text>
+    <text x="25" y="208" fill="#34d399" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">Чекбоксы: ✅ Вкл / ❌ Выкл</text>
+
+    <rect x="15" y="245" width="180" height="75" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="270" fill="#a7f3d0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">Routing Query</text>
+    <text x="25" y="290" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">Проверка активных</text>
+    <text x="25" y="307" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">подписчиков на пост</text>
+  </g>
+
+  <!-- Arrow 3 -> 4 -->
+  <path d="M 810 230 L 850 230" stroke="#34d399" stroke-width="2" />
+  <text x="830" y="220" fill="#34d399" font-size="11" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto">Bot API</text>
+
+  <!-- Node 4: Output / User Delivery -->
+  <g transform="translate(855, 120)">
+    <rect width="200" height="340" rx="12" fill="url(#nodeGrad1)" stroke="#f59e0b" stroke-width="1.5" />
+    <rect x="0" y="0" width="200" height="42" rx="12" fill="#f59e0b" fill-opacity="0.15" />
+    <text x="100" y="27" fill="#fbbf24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="14" font-weight="700" text-anchor="middle">4. Клиент / Чат</text>
+
+    <rect x="15" y="60" width="170" height="110" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="85" fill="#fde68a" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">Инлайн-Интерфейс</text>
+    <text x="25" y="105" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">• Меню /filters</text>
+    <text x="25" y="123" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">• Поиск /search</text>
+    <text x="25" y="141" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">• Диалоги Sync/Diff</text>
+    <text x="25" y="159" fill="#38bdf8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">✅/❌ Переключатели</text>
+
+    <rect x="15" y="185" width="170" height="135" rx="8" fill="#0f172a" stroke="#334155" />
+    <text x="25" y="210" fill="#fde68a" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="12" font-weight="600">Единая Лента</text>
+    <text x="25" y="230" fill="#38bdf8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11" font-weight="600">📁 [Папка] | 📢 [Канал]</text>
+    <text x="25" y="250" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">Текст поста с ссылками</text>
+    <text x="25" y="270" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="11">Медиа-альбомы / фото</text>
+    <text x="25" y="295" fill="#34d399" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto" font-size="10">⚡ Без шума и дублей</text>
+  </g>
+</svg>

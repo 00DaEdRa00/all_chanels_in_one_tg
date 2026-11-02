@@ -1,0 +1,14 @@
+services:
+  feed-bot:
+    build: .
+    container_name: tg-all-channels-feed
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./sessions:/app/sessions
+    environment:
+      - DB_PATH=/app/data/feed_bot.db
+      - USER_SESSION=/app/sessions/user_collector.session
+      - BOT_SESSION=/app/sessions/bot_interface.session
