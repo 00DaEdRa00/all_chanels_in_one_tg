@@ -44,6 +44,10 @@ try:
 except ValueError:
     ADMIN_ID = 0
 
+# Target channel for forwarding (e.g. '@my_feed_channel' or '-1001234567890')
+# Can also be configured dynamically per-user via /target command
+TARGET_CHANNEL_ID = os.getenv("TARGET_CHANNEL_ID", "").strip()
+
 # Auto-update settings
 AUTO_UPDATE_CODE = os.getenv("AUTO_UPDATE_CODE", "false").lower() in ("true", "1", "yes")
 CODE_CHECK_INTERVAL_HOURS = int(os.getenv("CODE_CHECK_INTERVAL_HOURS", "6"))

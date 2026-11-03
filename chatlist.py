@@ -1,6 +1,7 @@
 """
 Chatlist inspector and diff calculator.
 Uses Telethon MTProto API to resolve shareable folder links (t.me/addlist/...).
+Filters public (open) channels from private (closed) channels.
 """
 
 import re
@@ -35,29 +36,43 @@ def extract_slug(link_or_text: str) -> Optional[str]:
     return None
 
 
-async def inspect_chatlist(client: TelegramClient, slug: str) -> Tuple[str, List[Dict[str, Any]]]:
+async def inspect_chatlist(
+    client: TelegramClient, slug: str
+) -> Tuple[str, List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     Resolves the Telegram chatlist invite link without joining.
-    Returns (folder_title, list_of_channels).
+    Separates public (open) channels from private (closed) channels.
+    Returns: (folder_title, public_channels, private_channels)
     """
     result = await client(CheckChatlistInviteRequest(slug=slug))
-    folder_title = result.title if hasattr(result, 'title') else "Папка"
-    
-    channels = []
-    # Collect chat entities from result
+    folder_title = result.title if hasattr(result, "title") else "Папка"
+
+    public_channels = []
+    private_channels = []
+
+    # Map chats by ID
     chats_by_id = {c.id: c for c in getattr(result, "chats", [])}
 
     for peer in getattr(result, "peers", []):
         peer_id = getattr(peer, "channel_id", None) or getattr(peer, "chat_id", None)
         if peer_id and peer_id in chats_by_id:
             chat = chats_by_id[peer_id]
-            channels.append({
-                "id": chat.id,
-                "title": getattr(chat, "title", f"Chat {chat.id}"),
-                "username": getattr(chat, "username", None)
-            })
+            username = getattr(chat, "username", None)
+            title = getattr(chat, "title", f"Chat {chat.id}")
 
-    return folder_title, channels
+            channel_info = {
+                "id": chat.id,
+                "title": title,
+                "username": username,
+            }
+
+            # If username is present, it's an open (public) channel
+            if username:
+                public_channels.append(channel_info)
+            else:
+                private_channels.append(channel_info)
+
+    return folder_title, public_channels, private_channels
 
 
 async def diff_folder_channels(

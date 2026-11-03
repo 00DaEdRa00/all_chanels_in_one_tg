@@ -86,7 +86,18 @@ async def periodic_folder_sync_worker(
                 title = f["title"]
 
                 try:
-                    _, channels = await chatlist.inspect_chatlist(user_client, slug)
+                    _, channels, private_channels = await chatlist.inspect_chatlist(user_client, slug)
+
+                    # Handle and warn about closed channels
+                    if private_channels:
+                        for priv in private_channels:
+                            await db.remove_channel_from_system(priv["id"])
+                            await bot_client.send_message(
+                                user_id,
+                                f"⚠️ **Внимание:** Канал «{priv['title']}» является закрытым и не поддерживается.\n"
+                                f"Он был автоматически удалён из папки «{title}»."
+                            )
+
                     added, removed_ids, common = await chatlist.diff_folder_channels(folder_id, channels)
 
                     if added or removed_ids:

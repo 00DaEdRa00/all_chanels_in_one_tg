@@ -219,7 +219,17 @@ async def cmd_check_folders(event):
     changes_found = 0
     for f in folders:
         try:
-            _, channels = await chatlist.inspect_chatlist(user_client, f["slug"])
+            _, channels, private_channels = await chatlist.inspect_chatlist(user_client, f["slug"])
+
+            # Remove unsupported closed channels and notify user
+            if private_channels:
+                for priv in private_channels:
+                    await db.remove_channel_from_system(priv["id"])
+                    await event.respond(
+                        f"⚠️ **Внимание:** Канал «{priv['title']}» является закрытым и не поддерживается.\n"
+                        f"Он был удалён из папки «{f['title']}»."
+                    )
+
             added, removed_ids, common = await chatlist.diff_folder_channels(f["id"], channels)
             if added or removed_ids:
                 changes_found += 1
@@ -253,6 +263,33 @@ async def cmd_check_folders(event):
         await msg.edit(f"🔍 Проверка завершена. Найдено изменений в **{changes_found}** папках.")
 
 
+@bot.on(events.NewMessage(pattern=r"^/target(?:\s+(.+))?"))
+async def cmd_target(event):
+    """Sets or views destination channel for forwarded posts."""
+    arg = event.pattern_match.group(1)
+    user_id = event.sender_id
+
+    if not arg:
+        current = await db.get_user_target_channel(user_id) or config.TARGET_CHANNEL_ID or "Этот чат с ботом"
+        await event.respond(
+            f"🎯 **Текущий целевой канал пересылки:** `{current}`\n\n"
+            f"Чтобы изменить, напишите:\n`/target @channel_username` или `/target -1001234567890`\n"
+            f"Чтобы сбросить пересылку в этот чат: `/target reset`"
+        )
+        return
+
+    target = arg.strip()
+    if target.lower() == "reset":
+        await db.set_user_target_channel(user_id, "")
+        await event.respond("✅ Пересылка сброшена в этот личный чат с ботом.")
+    else:
+        await db.set_user_target_channel(user_id, target)
+        await event.respond(
+            f"✅ **Целевой канал сохранен:** `{target}`\n"
+            f"Убедитесь, что бот добавлен в целевой канал администратором с правом публикации сообщений!"
+        )
+
+
 # ==============================================================================
 # Addlist Link Receiver & Diff Management
 # ==============================================================================
@@ -282,14 +319,23 @@ async def handle_incoming_text(event):
     status_msg = await event.respond("⏳ Считываю данные папки через Telegram API...")
 
     try:
-        title, channels = await chatlist.inspect_chatlist(user_client, slug)
+        title, channels, private_channels = await chatlist.inspect_chatlist(user_client, slug)
     except Exception as err:
         logger.error(f"Error inspecting chatlist {slug}: {err}", exc_info=True)
         await status_msg.edit(f"❌ Не удалось прочитать папку: {err}\nПроверьте корректность ссылки.")
         return
 
+    # Warn if private/closed channels exist
+    if private_channels:
+        priv_names = "\n".join([f"• «{ch['title']}»" for ch in private_channels])
+        await event.respond(
+            f"⚠️ **Обнаружены закрытые каналы ({len(private_channels)}):**\n"
+            f"{priv_names}\n\n"
+            f"🚫 **Закрытые каналы не поддерживаются и были автоматически исключены.**"
+        )
+
     if not channels:
-        await status_msg.edit("⚠️ В этой папке нет доступных каналов или чатов.")
+        await status_msg.edit("⚠️ В этой папке нет доступных открытых каналов для добавления.")
         return
 
     existing_folder = await db.get_folder_by_slug(user_id, slug)
@@ -430,7 +476,7 @@ async def handle_callback_queries(event):
 
 @user_client.on(events.NewMessage)
 async def channel_post_listener(event):
-    """Listens to all posts in channels joined by the MTProto client and routes them to users."""
+    """Listens to all posts in channels joined by the MTProto client and routes them to users or target channels."""
     if not event.is_channel:
         return
 
@@ -439,6 +485,10 @@ async def channel_post_listener(event):
     # Normalize ID: Telethon chat_id might have -100 prefix or not
     normalized_id = int(str(channel_id).replace("-100", ""))
 
+    # Deduplication check
+    if await db.is_post_forwarded(normalized_id, event.message.id):
+        return
+
     recipients = await db.get_active_recipients_for_channel(normalized_id)
     if not recipients:
         return
@@ -446,24 +496,36 @@ async def channel_post_listener(event):
     chat = await event.get_chat()
     channel_title = getattr(chat, "title", "Канал")
 
+    # Mark as forwarded immediately to prevent duplicate delivery in high-load bursts
+    await db.mark_post_forwarded(normalized_id, event.message.id)
+
     for r in recipients:
         user_id = r["user_id"]
         folder_title = r["folder_title"]
+        target = r.get("target_channel") or config.TARGET_CHANNEL_ID or user_id
+
+        # Convert target to int if it's a numeric ID (e.g. -100...)
+        if isinstance(target, str) and (target.startswith("-100") or target.isdigit() or target.startswith("-")):
+            try:
+                target = int(target)
+            except ValueError:
+                pass
+
         header = f"📁 **{folder_title}** | 📢 **{channel_title}**\n\n"
 
         try:
             if event.message.media:
                 caption = header + (event.message.text or "")
-                await bot.send_file(user_id, event.message.media, caption=caption)
+                await bot.send_file(target, event.message.media, caption=caption)
             elif event.message.text:
-                await bot.send_message(user_id, header + event.message.text)
+                await bot.send_message(target, header + event.message.text)
         except FloodWaitError as e:
-            logger.warning(f"Flood wait {e.seconds}s on user {user_id}")
+            logger.warning(f"Flood wait {e.seconds}s on target {target}")
             await asyncio.sleep(e.seconds)
         except (UserIsBlockedError, InputUserDeactivatedError):
-            logger.info(f"User {user_id} blocked bot or account deactivated.")
+            logger.info(f"Target {target} blocked bot or account deactivated.")
         except Exception as e:
-            logger.error(f"Failed to deliver post to {user_id}: {e}")
+            logger.error(f"Failed to deliver post to target {target}: {e}")
 
 
 # ==============================================================================

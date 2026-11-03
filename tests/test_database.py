@@ -78,6 +78,32 @@ class TestFeedDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(common), 1)
         self.assertEqual(common[0]["id"], 2002)
 
+    async def test_deduplication_and_settings(self):
+        user_id = 7777
+
+        # Target channel setting
+        await db.set_user_target_channel(user_id, "@my_hub")
+        target = await db.get_user_target_channel(user_id)
+        self.assertEqual(target, "@my_hub")
+
+        # De-duplication check
+        channel_id = 55555
+        message_id = 101
+
+        self.assertFalse(await db.is_post_forwarded(channel_id, message_id))
+        await db.mark_post_forwarded(channel_id, message_id)
+        self.assertTrue(await db.is_post_forwarded(channel_id, message_id))
+
+        # Channel removal test
+        channels = [{"id": channel_id, "title": "Closed Ch", "username": None}]
+        folder_id = await db.add_folder_with_channels(user_id, "Folder", "slug777", channels)
+        cur_chans = await db.get_folder_channels(folder_id)
+        self.assertEqual(len(cur_chans), 1)
+
+        await db.remove_channel_from_system(channel_id)
+        after_chans = await db.get_folder_channels(folder_id)
+        self.assertEqual(len(after_chans), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
