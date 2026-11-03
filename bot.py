@@ -20,6 +20,8 @@ from telethon.errors import (
 import config
 import database as db
 import chatlist
+import updater
+import sync_worker
 
 # Logging configuration
 logging.basicConfig(
@@ -169,6 +171,86 @@ async def cmd_search(event):
 
     buttons = await build_folders_menu(event.sender_id, query.strip())
     await event.respond(f"🔎 Результаты поиска по запросу **«{query.strip()}»**:", buttons=buttons)
+
+
+# ==============================================================================
+# Admin & Self-Update Commands
+# ==============================================================================
+
+@bot.on(events.NewMessage(pattern=r"^/update"))
+async def cmd_update(event):
+    """Admin command to check and trigger bot self-update from GitHub."""
+    user_id = event.sender_id
+    if config.ADMIN_ID and user_id != config.ADMIN_ID:
+        return
+
+    current = updater.get_current_commit()
+    msg = await event.respond(f"🔍 Текущая версия: `{current}`\nПроверяю origin/main на GitHub...")
+
+    has_update, commit_info, count = await updater.check_git_updates()
+    if not has_update:
+        await msg.edit(f"✅ **Бот работает на актуальной версии!**\nХеш коммита: `{current}`")
+        return
+
+    buttons = [
+        [Button.inline(f"🚀 Обновить до {commit_info.split(':')[0]} ({count} комм.)", data="admin_apply_update")],
+        [Button.inline("❌ Отмена", data="admin_dismiss_update")]
+    ]
+    await msg.edit(
+        f"🔔 **Найдено обновление!**\n\n"
+        f"Коммитов позади: **{count}**\n"
+        f"Последний: `{commit_info}`\n\n"
+        f"Применить обновление и перезапустить бота?",
+        buttons=buttons
+    )
+
+
+@bot.on(events.NewMessage(pattern=r"^/check_folders"))
+async def cmd_check_folders(event):
+    """Manually triggers check for updates across user's folders."""
+    user_id = event.sender_id
+    msg = await event.respond("⏳ Сканирую ваши папки на наличие новых каналов в Telegram...")
+
+    folders = await db.get_user_folders(user_id)
+    if not folders:
+        await msg.edit("У вас нет подключенных папок для проверки.")
+        return
+
+    changes_found = 0
+    for f in folders:
+        try:
+            _, channels = await chatlist.inspect_chatlist(user_client, f["slug"])
+            added, removed_ids, common = await chatlist.diff_folder_channels(f["id"], channels)
+            if added or removed_ids:
+                changes_found += 1
+                update_key = f"{user_id}_{f['id']}"
+                pending_updates[update_key] = {
+                    "folder_id": f["id"],
+                    "title": f["title"],
+                    "new_channels": channels,
+                    "added": added,
+                    "removed_count": len(removed_ids),
+                }
+                text = (
+                    f"🔔 **В папке «{f['title']}» найдены изменения!**\n\n"
+                    f"• Новых каналов: **+{len(added)}**\n"
+                    f"• Удалено: **-{len(removed_ids)}**\n"
+                    f"• Без изменений: **{len(common)}**\n\n"
+                    f"Синхронизировать?"
+                )
+                buttons = [
+                    [Button.inline(f"➕ Добавить только новые (+{len(added)})", data=f"upd_add:{update_key}")],
+                    [Button.inline("🔄 Полная синхронизация", data=f"upd_sync:{update_key}")],
+                    [Button.inline("❌ Пропустить", data="cancel_update")]
+                ]
+                await event.respond(text, buttons=buttons)
+        except Exception as e:
+            logger.warning(f"Error checking folder {f['id']}: {e}")
+
+    if changes_found == 0:
+        await msg.edit("✅ Все ваши папки полностью актуальны! Новых каналов не обнаружено.")
+    else:
+        await msg.edit(f"🔍 Проверка завершена. Найдено изменений в **{changes_found}** папках.")
 
 
 # ==============================================================================
@@ -327,6 +409,20 @@ async def handle_callback_queries(event):
     elif data == "cancel_update":
         await event.edit("❌ Обновление папки отменено.")
 
+    elif data == "admin_apply_update":
+        if config.ADMIN_ID and user_id != config.ADMIN_ID:
+            await event.answer("Доступ запрещен.", alert=True)
+            return
+        await event.edit("🚀 **Загрузка обновления из Git и перезапуск процесса...**")
+        success, msg = await updater.apply_git_update()
+        if success:
+            updater.restart_service(notify_chat_id=user_id)
+        else:
+            await event.edit(f"❌ **Ошибка при обновлении:**\n`{msg}`")
+
+    elif data == "admin_dismiss_update":
+        await event.edit("❌ Уведомление об обновлении скрыто.")
+
 
 # ==============================================================================
 # Real-Time Channel Post Forwarder
@@ -386,11 +482,30 @@ async def main():
     await bot.start(bot_token=config.BOT_TOKEN)
     logger.info("Bot interface active and listening.")
 
-    # Concurrently run both clients
-    await asyncio.gather(
-        user_client.run_until_disconnected(),
-        bot.run_until_disconnected(),
+    # Check and send post-restart notification if update occurred
+    await updater.check_and_notify_post_restart(bot)
+
+    # Spawn background tasks for server 24/7 reliability
+    code_worker = asyncio.create_task(
+        sync_worker.periodic_code_update_worker(
+            bot, config.ADMIN_ID, config.CODE_CHECK_INTERVAL_HOURS, config.AUTO_UPDATE_CODE
+        )
     )
+    folder_worker = asyncio.create_task(
+        sync_worker.periodic_folder_sync_worker(
+            user_client, bot, config.FOLDER_CHECK_INTERVAL_HOURS, pending_updates
+        )
+    )
+
+    # Concurrently run both clients
+    try:
+        await asyncio.gather(
+            user_client.run_until_disconnected(),
+            bot.run_until_disconnected(),
+        )
+    finally:
+        code_worker.cancel()
+        folder_worker.cancel()
 
 
 if __name__ == "__main__":
